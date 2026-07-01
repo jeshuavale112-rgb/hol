@@ -1,203 +1,107 @@
-# 📖 Guía de Instalación
+# Installation and Running
 
-## Requisitos Previos
+## Prerequisites
+- Node.js 18+
+- PostgreSQL 14+
+- npm or yarn
 
-### Obligatorios
-- **Node.js** 18.x o superior
-- **npm** 9.x o superior
-- **PostgreSQL** 14.x o superior
-- **Git**
-
-### Opcionales
-- **Docker** y **Docker Compose** (para desarrollo con contenedores)
-- **Flutter SDK** (para aplicación móvil)
-- **Xcode** (para iOS en macOS)
-- **Android Studio** (para desarrollo Android)
-
-## Instalación Local
-
-### 1. Clonar el Repositorio
+## Backend Setup
 
 ```bash
-git clone https://github.com/tu-usuario/hol.git
-cd hol
-```
-
-### 2. Configurar Base de Datos PostgreSQL
-
-```bash
-# En Windows
-createdb -U postgres ecclesiapp
-
-# En macOS/Linux
-createdb ecclesiapp
-```
-
-O usar Docker:
-```bash
-docker run --name postgres-ecclesiapp \
-  -e POSTGRES_PASSWORD=password \
-  -e POSTGRES_DB=ecclesiapp \
-  -p 5432:5432 \
-  -d postgres:15-alpine
-```
-
-### 3. Configurar Backend
-
-```bash
+# 1. Navigate to backend
 cd backend
 
-# Instalar dependencias
+# 2. Install dependencies
 npm install
 
-# Configurar variables de entorno
+# 3. Setup environment
+cp .env.example .env
+# Edit .env with your database credentials
+
+# 4. Create database and run migrations
+npx prisma migrate dev --name init
+
+# 5. Seed database with initial data
+npm run seed
+
+# 6. Start server
+npm run dev
+```
+
+Backend will run on `http://localhost:3000`
+
+## Frontend Setup
+
+```bash
+# 1. Navigate to frontend
+cd frontend
+
+# 2. Install dependencies
+npm install
+
+# 3. Setup environment
 cp .env.example .env
 
-# Editar .env con tu configuración
-# DATABASE_URL=postgresql://user:password@localhost:5432/ecclesiapp
-
-# Ejecutar migraciones
-npx prisma migrate dev
-
-# Iniciar servidor de desarrollo
+# 4. Start development server
 npm run dev
 ```
 
-El backend estará disponible en `http://localhost:3000`
+Frontend will run on `http://localhost:5173`
 
-### 4. Configurar Frontend
-
-```bash
-cd ../frontend
-
-# Instalar dependencias
-npm install
-
-# Iniciar servidor de desarrollo
-npm run dev
-```
-
-El frontend estará disponible en `http://localhost:5173`
-
-## Instalación con Docker
-
-### Usando Docker Compose
+## Using Docker Compose
 
 ```bash
-# Crear archivo .env en la raíz del proyecto
-cp backend/.env.example .env
-
-# Iniciar contenedores
-docker-compose up -d
-
-# Ejecutar migraciones
-docker-compose exec backend npx prisma migrate dev
-
-# Detener contenedores
-docker-compose down
+# From project root
+docker-compose up
 ```
 
-Acceso:
-- Frontend: `http://localhost`
-- Backend API: `http://localhost:3000/api`
-- PostgreSQL: `localhost:5432`
-- Redis: `localhost:6379`
+This will start:
+- PostgreSQL on port 5432
+- Redis on port 6379
+- Backend on port 3000
+- Frontend on port 80
 
-## Instalación de Aplicación de Escritorio (Electron)
+## Default Test Account
 
-```bash
-cd desktop
+- **Email**: test@example.com
+- **Password**: test123
 
-npm install
+## Available Endpoints
 
-npm run dev
-```
+### Authentication
+- POST `/api/auth/register` - Register new user
+- POST `/api/auth/login` - Login user
+- POST `/api/auth/logout` - Logout
+- GET `/api/auth/verify` - Verify token
 
-## Instalación de Aplicación Móvil (Flutter)
+### Songs
+- GET `/api/songs` - Get all songs (paginated, filterable)
+- GET `/api/songs/:id` - Get song by ID
+- POST `/api/songs` - Create song
+- PATCH `/api/songs/:id` - Update song
+- DELETE `/api/songs/:id` - Delete song
+- GET `/api/songs/search?q=query` - Search songs
+- GET `/api/songs/tags` - Get all tags
 
-### Configuración Inicial
+### Services
+- GET `/api/services` - Get all services
+- GET `/api/services/:id` - Get service by ID
+- POST `/api/services` - Create service
+- PATCH `/api/services/:id` - Update service
+- DELETE `/api/services/:id` - Delete service
 
-```bash
-cd mobile
+### Users
+- GET `/api/users/me` - Get current user
+- PATCH `/api/users/me` - Update profile
 
-flutter pub get
-```
+### Bible
+- GET `/api/bible/search?q=query` - Search verses
+- GET `/api/bible/:book/:chapter/:verse` - Get specific verse
 
-### Android
-
-```bash
-flutter run -d android
-```
-
-### iOS (requiere macOS)
-
-```bash
-flutter run -d ios
-```
-
-## Verificación de Instalación
-
-### Backend
-```bash
-curl http://localhost:3000/api/health
-```
-
-Respuesta esperada:
-```json
-{
-  "status": "OK",
-  "timestamp": "2024-01-01T12:00:00.000Z",
-  "version": "1.0.0"
-}
-```
-
-### Frontend
-Visita `http://localhost:5173` en tu navegador
-
-## Solución de Problemas
-
-### Error: Puerto ya en uso
-```bash
-# Cambiar puerto en .env o mediante variable de entorno
-PORT=3001 npm run dev
-```
-
-### Error: Base de datos no conecta
-```bash
-# Verificar que PostgreSQL está corriendo
-# En Windows
-psql -U postgres -d postgres -c "SELECT version();"
-
-# En macOS/Linux
-psql -U postgres -c "SELECT version();"
-```
-
-### Error: Dependencias no instalan
-```bash
-# Limpiar cache y reinstalar
-rm -rf node_modules package-lock.json
-npm install
-```
-
-## Variables de Entorno Importantes
-
-```env
-# Backend
-PORT=3000
-NODE_ENV=development
-DATABASE_URL=postgresql://user:password@localhost:5432/ecclesiapp
-JWT_SECRET=your-secret-key
-
-# Frontend
-VITE_API_URL=http://localhost:3000
-```
-
-## Próximos Pasos
-
-1. Lee la documentación de [API](./API.md)
-2. Explora la [estructura del proyecto](./ESTRUCTURA.md)
-3. Comienza a desarrollar
-
----
-
-¿Necesitas ayuda? Abre un issue o contacta con el equipo.
+### Presentations
+- GET `/api/presentations` - Get all presentations
+- GET `/api/presentations/:id` - Get presentation
+- POST `/api/presentations` - Create presentation
+- PATCH `/api/presentations/:id` - Update presentation
+- DELETE `/api/presentations/:id` - Delete presentation
+- POST `/api/presentations/:id/slides` - Add slide

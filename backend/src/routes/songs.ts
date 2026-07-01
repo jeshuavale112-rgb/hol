@@ -1,101 +1,191 @@
 import express, { Router, Request, Response } from 'express'
+import { songService } from '../services/songService'
+import { authMiddleware } from '../middleware/auth'
+import { asyncHandler } from '../middleware/error'
 import multer from 'multer'
 
 const router: Router = express.Router()
-
-// Configurar multer para subir archivos
 const upload = multer({ dest: 'uploads/covers' })
 
+// Aplicar middleware de autenticación a todas las rutas
+router.use(authMiddleware)
+
 // GET - Obtener todas las canciones
-router.get('/', async (req: Request, res: Response) => {
-  try {
-    // TODO: Implementar lógica de obtención de canciones
+router.get(
+  '/',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { category, tags, search, sortBy, sortOrder, page, limit } = req.query
+
+    const filters = {
+      category: category as string,
+      tags: tags ? (Array.isArray(tags) ? tags : [tags]) : [],
+      search: search as string,
+      sortBy: (sortBy as 'title' | 'artist' | 'createdAt' | 'updatedAt') || 'title',
+      sortOrder: (sortOrder as 'asc' | 'desc') || 'asc',
+      page: page ? parseInt(page as string) : 1,
+      limit: limit ? parseInt(limit as string) : 20,
+    }
+
+    const { songs, total } = await songService.getAllSongs(req.userId!, filters)
+
+    const totalPages = Math.ceil(total / filters.limit)
+
     res.json({
       success: true,
-      data: [],
-      total: 0,
-      page: 1,
-      limit: 20,
-      totalPages: 0,
+      data: songs,
+      total,
+      page: filters.page,
+      limit: filters.limit,
+      totalPages,
     })
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Error fetching songs' })
-  }
-})
+  })
+)
 
 // GET - Obtener canción por ID
-router.get('/:id', async (req: Request, res: Response) => {
-  try {
+router.get(
+  '/:id',
+  asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params
-    // TODO: Implementar lógica de obtención de canción por ID
-    res.json({ success: true, data: null })
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Error fetching song' })
-  }
-})
+    const song = await songService.getSongById(id, req.userId!)
 
-// POST - Crear nueva canción
-router.post('/', upload.single('cover'), async (req: Request, res: Response) => {
-  try {
-    // TODO: Implementar lógica de creación de canción
-    res.status(201).json({ success: true, data: null })
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Error creating song' })
-  }
-})
+    if (!song) {
+      return res.status(404).json({ success: false, error: 'Song not found' })
+    }
+
+    res.json({ success: true, data: song })
+  })
+)
+
+// POST - Crear canción
+router.post(
+  '/',
+  upload.single('cover'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const {
+      title,
+      artist,
+      album,
+      lyrics,
+      chords,
+      category,
+      tags,
+      duration,
+      key,
+      tempo,
+    } = req.body
+
+    if (!title || !artist || !lyrics) {
+      return res.status(400).json({
+        success: false,
+        error: 'Title, artist, and lyrics are required',
+      })
+    }
+
+    const parsedTags = typeof tags === 'string' ? JSON.parse(tags) : tags
+
+    const song = await songService.createSong(req.userId!, {
+      title,
+      artist,
+      album,
+      lyrics,
+      chords,
+      category: category || 'other',
+      tags: parsedTags || [],
+      duration: duration ? parseInt(duration) : undefined,
+      key,
+      tempo: tempo ? parseInt(tempo) : undefined,
+      cover: req.file?.path || undefined,
+    })
+
+    res.status(201).json({ success: true, data: song })
+  })
+)
 
 // PATCH - Actualizar canción
-router.patch('/:id', upload.single('cover'), async (req: Request, res: Response) => {
-  try {
+router.patch(
+  '/:id',
+  upload.single('cover'),
+  asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params
-    // TODO: Implementar lógica de actualización de canción
-    res.json({ success: true, data: null })
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Error updating song' })
-  }
-})
+    const {
+      title,
+      artist,
+      album,
+      lyrics,
+      chords,
+      category,
+      tags,
+      duration,
+      key,
+      tempo,
+    } = req.body
+
+    const parsedTags = tags
+      ? typeof tags === 'string'
+        ? JSON.parse(tags)
+        : tags
+      : undefined
+
+    const updateData: any = {}
+    if (title) updateData.title = title
+    if (artist) updateData.artist = artist
+    if (album !== undefined) updateData.album = album
+    if (lyrics) updateData.lyrics = lyrics
+    if (chords !== undefined) updateData.chords = chords
+    if (category) updateData.category = category
+    if (parsedTags) updateData.tags = parsedTags
+    if (duration) updateData.duration = parseInt(duration)
+    if (key !== undefined) updateData.key = key
+    if (tempo) updateData.tempo = parseInt(tempo)
+    if (req.file?.path) updateData.cover = req.file.path
+
+    const song = await songService.updateSong(id, req.userId!, updateData)
+
+    if (!song) {
+      return res.status(404).json({ success: false, error: 'Song not found' })
+    }
+
+    res.json({ success: true, data: song })
+  })
+)
 
 // DELETE - Eliminar canción
-router.delete('/:id', async (req: Request, res: Response) => {
-  try {
+router.delete(
+  '/:id',
+  asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params
-    // TODO: Implementar lógica de eliminación de canción
-    res.json({ success: true, message: 'Song deleted' })
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Error deleting song' })
-  }
-})
+    const deleted = await songService.deleteSong(id, req.userId!)
+
+    if (!deleted) {
+      return res.status(404).json({ success: false, error: 'Song not found' })
+    }
+
+    res.json({ success: true, message: 'Song deleted successfully' })
+  })
+)
 
 // GET - Buscar canciones
-router.get('/search', async (req: Request, res: Response) => {
-  try {
+router.get(
+  '/search',
+  asyncHandler(async (req: Request, res: Response) => {
     const { q } = req.query
-    // TODO: Implementar lógica de búsqueda
-    res.json({ success: true, data: [] })
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Error searching songs' })
-  }
-})
 
-// GET - Obtener canciones por categoría
-router.get('/category/:category', async (req: Request, res: Response) => {
-  try {
-    const { category } = req.params
-    // TODO: Implementar lógica de filtrado por categoría
-    res.json({ success: true, data: [] })
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Error fetching songs by category' })
-  }
-})
+    if (!q || typeof q !== 'string') {
+      return res.status(400).json({ success: false, error: 'Search query required' })
+    }
+
+    const songs = await songService.searchSongs(req.userId!, q)
+    res.json({ success: true, data: songs })
+  })
+)
 
 // GET - Obtener todas las etiquetas
-router.get('/tags', async (req: Request, res: Response) => {
-  try {
-    // TODO: Implementar lógica de obtención de etiquetas
-    res.json({ success: true, data: [] })
-  } catch (error) {
-    res.status(500).json({ success: false, error: 'Error fetching tags' })
-  }
-})
+router.get(
+  '/tags',
+  asyncHandler(async (req: Request, res: Response) => {
+    const tags = await songService.getAllTags(req.userId!)
+    res.json({ success: true, data: tags })
+  })
+)
 
 export default router
