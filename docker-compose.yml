@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: ecclesiapp-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-ecclesiapp}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-ecclesiapp123}
+      POSTGRES_DB: ${DB_NAME:-ecclesiapp}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ecclesiapp-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-ecclesiapp}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: ecclesiapp-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - ecclesiapp-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ecclesiapp-backend
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${DB_USER:-ecclesiapp}:${DB_PASSWORD:-ecclesiapp123}@postgres:5432/${DB_NAME:-ecclesiapp}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ecclesiapp-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ecclesiapp-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - ecclesiapp-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  ecclesiapp-network:
+    driver: bridge
