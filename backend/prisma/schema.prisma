@@ -1,0 +1,113 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Model
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  password  String
+  name      String?
+  role      UserRole   @default(USER)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  songs     Song[]
+  services  Service[]
+}
+
+enum UserRole {
+  ADMIN
+  MODERATOR
+  USER
+}
+
+// Song Model
+model Song {
+  id        String   @id @default(cuid())
+  title     String
+  artist    String
+  album     String?
+  lyrics    String   @db.Text
+  chords    String?  @db.Text
+  category  String   @default("other")
+  tags      String[] @default([])
+  duration  Int?     // en segundos
+  key       String?  // Tonalidad
+  tempo     Int?     // BPM
+  cover     String?  // URL o path
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([category])
+  @@index([title])
+}
+
+// Service/Worship Model (Culto/Servicio)
+model Service {
+  id        String   @id @default(cuid())
+  title     String
+  date      DateTime
+  startTime String
+  endTime   String?
+  type      String   // Culto, Ensayo, Evento, etc
+  status    String   @default("draft") // draft, scheduled, in-progress, completed
+  songs     String[] @default([]) // IDs de canciones
+  notes     String?  @db.Text
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([date])
+}
+
+// Bible Verse Model
+model BibleVerse {
+  id        String   @id @default(cuid())
+  book      String
+  chapter   Int
+  verse     Int
+  text      String   @db.Text
+  language  String   @default("es")
+  version   String
+  createdAt DateTime @default(now())
+
+  @@index([book])
+  @@index([language])
+}
+
+// Presentation Model (Para proyecciones)
+model Presentation {
+  id        String   @id @default(cuid())
+  title     String
+  slides    Slide[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Presentation Slide
+model Slide {
+  id             String       @id @default(cuid())
+  presentationId String
+  presentation   Presentation @relation(fields: [presentationId], references: [id], onDelete: Cascade)
+  order          Int
+  type           String       // "song", "verse", "text", "image"
+  content        String       @db.Text
+  backgroundColor String?     @default("#000000")
+  textColor      String?      @default("#FFFFFF")
+  createdAt      DateTime     @default(now())
+
+  @@index([presentationId])
+}
